@@ -43,7 +43,6 @@ class Gui:
     def _check_jsonfile(self):
         with open(Path(__file__).parent/"database"/"database_table.json", 'r') as json_file:
             json_data = json.load(json_file)
-            print(json_data)
 
             if json_data["validate_table"] == "False":
                 return False
@@ -58,6 +57,8 @@ class Gui:
             self.logger.info("Creatng new account...")
 
             self.db.create_tables(str(root_password))
+            # get encryption key
+            self.db.cipher_key(root_password)
 
             #Clear the login Page
             for widget in self.frame.winfo_children():
@@ -72,9 +73,12 @@ class Gui:
             self.logger.info("Authenticating password...")
 
             #checks if password is valid
-            if root_password == self.db.show_root():
+            if self.db.confirm_root(root_password):
 
                 self.logger.info("Password confirmed...")
+
+                # get encryption key
+                self.db.cipher_key(root_password)
 
                 #Clear the login Page
                 for widget in self.frame.winfo_children():
@@ -84,7 +88,7 @@ class Gui:
                 self.main_page()
 
             # Display wrong password if password is not valid
-            elif root_password != self.db.show_root():
+            elif not self.db.confirm_root(root_password):
                 self.logger.info("Wrong Password...")
                       
                 self.password_entry.delete(first=0, last="end")
@@ -311,6 +315,7 @@ class Gui:
                 name_grid = 2
                 description_grid = 3
                 password_grid = 4
+                label_space_grid = 6
 
                 id_pady = 5
                 
@@ -344,33 +349,35 @@ class Gui:
                 for password in passwords:
 
                     id_label = tkinter.Label(master=self.display_frame, text="ID:", font=("Helvetica", 16), anchor="w", justify="left")
-                    id_label.grid(row=id_grid, column=0, pady=id_pady)
+                    id_label.grid(row=id_grid, column=0, sticky="w", padx=20, pady=id_pady)
                     password_id = tkinter.Label(master=self.display_frame, text=password[0], font=("Helvetica", 16))
-                    password_id.grid(row=id_grid, column=1, pady=id_pady)
+                    password_id.grid(row=id_grid, column=1, sticky="w", padx=20, pady=id_pady)
 
                     name_label = tkinter.Label(master=self.display_frame, text="Name:", font=("Helvetica", 16))
-                    name_label.grid(row=name_grid, column=0, pady=5)
+                    name_label.grid(row=name_grid, column=0, sticky="w", padx=20, pady=5)
                     password_name = tkinter.Label(master=self.display_frame, text=password[1], font=("Helvetica", 16))
-                    password_name.grid(row=name_grid, column=1, pady=5)
+                    password_name.grid(row=name_grid, column=1, sticky="w", padx=20, pady=5)
 
                     description_label = tkinter.Label(master=self.display_frame, text="Description:", font=("Helvetica", 16))
-                    description_label.grid(row=description_grid, column=0, pady=5)
+                    description_label.grid(row=description_grid, sticky="w", padx=20, column=0, pady=5)
                     password_description = tkinter.Label(master=self.display_frame, text=password[2], font=("Helvetica", 16))
-                    password_description.grid(row=description_grid, column=1, pady=5)
+                    password_description.grid(row=description_grid, sticky="w", padx=20, column=1, pady=5)
+
+                    label_space = tkinter.Label(master=self.display_frame, font=("Helvetica", 16))
+                    label_space.grid(row=label_space_grid, sticky="w", padx=20, column=0, pady=5)
 
                     password_label = tkinter.Label(master=self.display_frame, text="Password:", font=("Helvetica", 16))
                     password_pass = tkinter.Label(master=self.display_frame, text=password[3], font=("Helvetica", 16))
                     if self.show:
-                        password_label.grid(row=password_grid, column=0, pady=5)
-                        password_pass.grid(row=password_grid, column=1, pady=5)
+                        password_label.grid(row=password_grid, column=0, sticky="w", padx=20, pady=5)
+                        password_pass.grid(row=password_grid, column=1, sticky="w", padx=20, pady=5)
 
                     # push down for next password
                     id_grid += 5
                     name_grid += 5
                     description_grid += 5
                     password_grid += 5
-                    ''' if id_pady != 10:
-                        id_pady += 5 '''
+                    label_space_grid += 5
 
         # Search by Id
         if not self.search_by:
@@ -415,28 +422,31 @@ class Gui:
 
             # Display search result
             title = tkinter.Label(master=self.display_frame, text="Search For Password", anchor="center", justify="center", font=("monospace", 25, "bold"))
-            title.grid(row=0, column=0, columnspan=2)
+            title.grid(row=0, column=0, sticky="w", padx=20, columnspan=2)
 
             id_label = tkinter.Label(master=self.display_frame, text="ID:", font=("Helvetica", 16))
-            id_label.grid(row=1, column=0, pady=5)
-            password_id = tkinter.Label(master=self.display_frame, text=password[0][0], font=("Helvetica", 16))
-            password_id.grid(row=1, column=1, pady=5)
+            id_label.grid(row=1, column=0, sticky="w", padx=20, pady=5)
+            password_id = tkinter.Label(master=self.display_frame, text=password[0], font=("Helvetica", 16))
+            password_id.grid(row=1, column=1, sticky="w", padx=20, pady=5)
 
             name_label = tkinter.Label(master=self.display_frame, text="Name:", font=("Helvetica", 16))
-            name_label.grid(row=2, column=0, pady=5)
-            password_name = tkinter.Label(master=self.display_frame, text=password[0][1], font=("Helvetica", 16))
-            password_name.grid(row=2, column=1, pady=5)
+            name_label.grid(row=2, column=0, sticky="w", padx=20, pady=5)
+            password_name = tkinter.Label(master=self.display_frame, text=password[1], font=("Helvetica", 16))
+            password_name.grid(row=2, column=1, sticky="w", padx=20, pady=5)
 
             description_label = tkinter.Label(master=self.display_frame, text="Description:", font=("Helvetica", 16))
-            description_label.grid(row=3, column=0, pady=5)
-            password_description = tkinter.Label(master=self.display_frame, text=password[0][2], font=("Helvetica", 16))
-            password_description.grid(row=3, column=1, pady=5)
+            description_label.grid(row=3, column=0, sticky="w", padx=20, pady=5)
+            password_description = tkinter.Label(master=self.display_frame, text=password[2], font=("Helvetica", 16))
+            password_description.grid(row=3, column=1, sticky="w", padx=20, pady=5)
+
+            label_space = tkinter.Label(master=self.display_frame, font=("Helvetica", 16))
+            label_space.grid(row=5, sticky="w", padx=20, column=0, pady=5)
 
             password_label = tkinter.Label(master=self.display_frame, text="Password:", font=("Helvetica", 16))
-            password_pass = tkinter.Label(master=self.display_frame, text=password[0][3], font=("Helvetica", 16))
+            password_pass = tkinter.Label(master=self.display_frame, text=password[3], font=("Helvetica", 16))
             if self.show:
-                password_label.grid(row=4, column=0, pady=5)
-                password_pass.grid(row=4, column=1, pady=5)
+                password_label.grid(row=4, column=0, sticky="w", padx=20, pady=5)
+                password_pass.grid(row=4, column=1, sticky="w", padx=20, pady=5)
 
 
                 
@@ -522,6 +532,7 @@ class Gui:
         name_grid = 2
         description_grid = 3
         password_grid = 4
+        label_space_grid = 5
         
         # Reset the display screen
         for widget in self.display_frame.winfo_children():
@@ -548,36 +559,44 @@ class Gui:
 
         # Display search result
         title = tkinter.Label(master=self.display_frame, text="Show Saved Passwords", anchor="center", justify="center", font=("monospace", 25, "bold"))
-        title.grid(row=0, column=0, columnspan=2)
+        title.grid(row=0, column=0, sticky="w", padx=20, columnspan=2)
 
         for password in passwords:
 
             id_label = tkinter.Label(master=self.display_frame, text="ID:", font=("Helvetica", 16), anchor="w", justify="left")
-            id_label.grid(row=id_grid, column=0, pady=5)
+            id_label.grid(row=id_grid, column=0, sticky="w", padx=20, pady=5)
+            
             password_id = tkinter.Label(master=self.display_frame, text=password[0], font=("Helvetica", 16))
-            password_id.grid(row=id_grid, column=1, pady=5)
+            password_id.grid(row=id_grid, column=1, sticky="w", padx=20, pady=5)
+            
 
             name_label = tkinter.Label(master=self.display_frame, text="Name:", font=("Helvetica", 16))
-            name_label.grid(row=name_grid, column=0, pady=5)
+            name_label.grid(row=name_grid, column=0, sticky="w", padx=20, pady=5)
+            
             password_name = tkinter.Label(master=self.display_frame, text=password[1], font=("Helvetica", 16))
-            password_name.grid(row=name_grid, column=1, pady=5)
+            password_name.grid(row=name_grid, column=1, sticky="w", padx=20, pady=5)
+            
 
             description_label = tkinter.Label(master=self.display_frame, text="Description:", font=("Helvetica", 16))
-            description_label.grid(row=description_grid, column=0, pady=5)
+            description_label.grid(row=description_grid, column=0, sticky="w", padx=20, pady=5)
             password_description = tkinter.Label(master=self.display_frame, text=password[2], font=("Helvetica", 16))
-            password_description.grid(row=description_grid, column=1, pady=5)
+            password_description.grid(row=description_grid, column=1, sticky="w", padx=20, pady=5)
+
+            label_space = tkinter.Label(master=self.display_frame, font=("Helvetica", 16))
+            label_space.grid(row=label_space_grid, sticky="w", padx=20, column=0, pady=5)
 
             password_label = tkinter.Label(master=self.display_frame, text="Password:", font=("Helvetica", 16))
             password_pass = tkinter.Label(master=self.display_frame, text=password[3], font=("Helvetica", 16))
             if self.show_all:
-                password_label.grid(row=password_grid, column=0, pady=5)
-                password_pass.grid(row=password_grid, column=1, pady=5)
+                password_label.grid(row=password_grid, column=0, sticky="w", padx=20, pady=5)
+                password_pass.grid(row=password_grid, column=1, sticky="w", padx=20, pady=5)
 
             # push down for next password
             id_grid += 5
             name_grid += 5
             description_grid += 5
             password_grid += 5
+            label_space_grid += 5
 
 
     def get_all_password(self):
@@ -602,7 +621,7 @@ class Gui:
         self.hide_all_pass = tkinter.Checkbutton(self.display_frame, variable=self.not_show_all_pass_int, text="Remove All Password", font=("Helvetica", 12), command= self._not_show_all_password, highlightthickness=0)
 
         # Submit Button
-        submit_btn = tkinter.Button(master=self.display_frame, highlightbackground="gray", activebackground="#e6e6e6", relief="flat", text = "Get All Passwords", anchor="center", justify="center", font=("Helvetica", 18), command= self._get_all_password)
+        submit_btn = tkinter.Button(master=self.display_frame, highlightbackground="gray", activebackground="#e6e6e6", relief="flat", text = "Get Passwords", anchor="center", justify="center", font=("Helvetica", 18), command= self._get_all_password)
         submit_btn.place(relx=0.05, rely=0.25, relwidth=0.48, relheight=0.07)
 
     def _update_password(self, id: str, name: str, description: str, password: str):
@@ -695,7 +714,7 @@ class Gui:
         self.update_password_input.place(relx=0.37, rely=0.515, relwidth=0.62, relheight=0.05)
 
         # Submit Button
-        submit_btn = tkinter.Button(master=self.display_frame, highlightbackground="gray", activebackground="#e6e6e6", relief="flat", text = "Submit", anchor="center", justify="center", font=("Helvetica", 18), command= lambda: self._update_password(self.update_id_input.get(), self.update_name_input.get(), self.update_description_input.get(), self.update_password_input.get()))
+        submit_btn = tkinter.Button(master=self.display_frame, highlightbackground="gray", activebackground="#e6e6e6", relief="flat", text = "Update", anchor="center", justify="center", font=("Helvetica", 18), command= lambda: self._update_password(self.update_id_input.get(), self.update_name_input.get(), self.update_description_input.get(), self.update_password_input.get()))
         submit_btn.place(relx=0.05, rely=0.6, relwidth=0.3, relheight=0.08)
 
     
@@ -730,7 +749,7 @@ class Gui:
             info_label.configure(text="Password Doesn't Exist")
             return
 
-        if root_password != str(self.db.show_root()):
+        if not self.db.confirm_root(root_password):
             info_label.configure(text="")
             info_label.configure(text="Root Password Incorrect")
             return
@@ -767,7 +786,7 @@ class Gui:
         self.delete_id_input.place(relx=0.425, rely=0.3, relwidth=0.57, relheight=0.05)
 
         # Submit Button
-        submit_btn = tkinter.Button(master=self.display_frame, highlightbackground="gray", activebackground="#e6e6e6", relief="flat", text = "Submit", anchor="center", justify="center", font=("Helvetica", 18), command= lambda: self._delete_password(self.delete_id_input.get(), self.delete_root_input.get()))
+        submit_btn = tkinter.Button(master=self.display_frame, highlightbackground="gray", activebackground="#e6e6e6", relief="flat", text = "Delete", anchor="center", justify="center", font=("Helvetica", 18), command= lambda: self._delete_password(self.delete_id_input.get(), self.delete_root_input.get()))
         submit_btn.place(relx=0.05, rely=0.4, relwidth=0.3, relheight=0.08)
 
 
@@ -805,7 +824,7 @@ class Gui:
             info_label.configure(text="Fill All Sections")
             return
 
-        if root_password != str(self.db.show_root()):
+        if not self.db.confirm_root(root_password):
             info_label.configure(text="")
             info_label.configure(text="Root Password Incorrect")
             return
@@ -847,7 +866,7 @@ class Gui:
         self.delete_all_root_input.focus()
 
         # Submit Button
-        submit_btn = tkinter.Button(master=self.display_frame, highlightbackground="gray", activebackground="#e6e6e6", relief="flat", text = "Submit", anchor="center", justify="center", font=("Helvetica", 18), command= lambda: self._delete_all_password(self.delete_all_root_input.get()))
+        submit_btn = tkinter.Button(master=self.display_frame, highlightbackground="gray", activebackground="#e6e6e6", relief="flat", text = "Delete", anchor="center", justify="center", font=("Helvetica", 18), command= lambda: self._delete_all_password(self.delete_all_root_input.get()))
         submit_btn.place(relx=0.05, rely=0.3, relwidth=0.3, relheight=0.08)
 
     def _update_root_password(self, root_password: str, new_root: str, confirm_root: str):
@@ -864,7 +883,7 @@ class Gui:
             info_label.configure(text="Fill All Sections")
             return
 
-        if root_password != str(self.db.show_root()):
+        if not self.db.confirm_root(root_password):
             info_label.config(text="Root Password Incorrect")
             return
 
@@ -876,8 +895,9 @@ class Gui:
         response = self._confirm(update_root=True)
         
         if response:
-            # delete All password
+            # update root password
             self.db.update_root_password(root_password, new_root)
+
             info_label.configure(text="")
             info_label.configure(text="Root Password Updated")
 
@@ -922,7 +942,7 @@ class Gui:
         self.confirm_root_input.place(relx=0.45, rely=0.4, relwidth=0.545, relheight=0.05)
 
         # Submit Button
-        submit_btn = tkinter.Button(master=self.display_frame, highlightbackground="gray", activebackground="#e6e6e6", relief="flat", text = "Submit", anchor="center", justify="center", font=("Helvetica", 18), command= lambda: self._update_root_password(self.current_root_input.get(), self.new_root_input.get(), self.confirm_root_input.get()))
+        submit_btn = tkinter.Button(master=self.display_frame, highlightbackground="gray", activebackground="#e6e6e6", relief="flat", text = "Update", anchor="center", justify="center", font=("Helvetica", 18), command= lambda: self._update_root_password(self.current_root_input.get(), self.new_root_input.get(), self.confirm_root_input.get()))
         submit_btn.place(relx=0.05, rely=0.5, relwidth=0.3, relheight=0.08)
 
     def _delete_account(self, root_password: str):
@@ -939,7 +959,7 @@ class Gui:
             info_label.configure(text="Fill All Sections")
             return
 
-        if root_password != str(self.db.show_root()):
+        if not self.db.confirm_root(root_password):
             info_label.configure(text="")
             info_label.configure(text="Root Password Incorrect")
             return
@@ -984,7 +1004,7 @@ class Gui:
         self.delete_account_root_input.focus()
 
         # Submit Button
-        submit_btn = tkinter.Button(master=self.display_frame, highlightbackground="gray", activebackground="#e6e6e6", relief="flat", text = "Submit", anchor="center", justify="center", font=("Helvetica", 18), command= lambda: self._delete_account(self.delete_account_root_input.get()))
+        submit_btn = tkinter.Button(master=self.display_frame, highlightbackground="gray", activebackground="#e6e6e6", relief="flat", text = "Delete Account", anchor="center", justify="center", font=("Helvetica", 18), command= lambda: self._delete_account(self.delete_account_root_input.get()))
         submit_btn.place(relx=0.05, rely=0.3, relwidth=0.3, relheight=0.08)        
 
     def main_page(self):

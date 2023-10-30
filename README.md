@@ -2,9 +2,13 @@
 
 This program is a Desktop Application that safely stores your passwords and login details in a secure and organised manner.
 
+![](assets/preview1.png)
+
 ### About
 
 A password manager application. Made with python tkinter, It stores sensitive and important information safely and securely withough the worry of any infromation breach. All details are encrypted before being stored in a SQLite database.
+
+
 
 ### Features
 
@@ -13,6 +17,7 @@ It has a variety of functions, some which include:
 - Updating Existing passwords
 - Deleting irrelivant information
 - Deleting the account if need be
+![](assets/preview2.png)
 
 ## Getting Started
 
@@ -35,6 +40,11 @@ It has a variety of functions, some which include:
 
    ```bash
    cd passman
+   ```
+4. Install application requirements using
+
+   ```bash
+   pip install -r requirements.txt
    ```
 
 ## Using The App

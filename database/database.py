@@ -1,6 +1,9 @@
 import os, json
-import logging
-import sqlite3
+import logging, sqlite3
+import hashlib
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+from cryptography.fernet import Fernet, base64
 from pathlib import Path
 from threading import Lock
  
@@ -71,7 +74,6 @@ class Database:
         self.db_cur = self.db.cursor()
         self.cursor_lock = Lock()
 
-        self.root_password = ""
 
     def create_tables(self, root_password: str):
 
@@ -83,14 +85,21 @@ class Database:
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
             description VARCHAR(300),
-            password TEXT NOT NULL
+            password TEXT NOT NULL,
+            salt TEXT
         )
         """)
-        # self.db.commit()
+
+        # Encrypt password with hash encryption
+        hasher = hashlib.sha256()
+        hasher.update(root_password.encode())
+        root_password = hasher.hexdigest()
+
+        salt = os.urandom(16)
 
         # add admin password as the first password
-        root_list = ['root', 'root password', root_password]
-        self.db_cur.execute("INSERT INTO password (name, description, password) VALUES (?, ?, ?)", (root_list))
+        root_list = ['root', 'root password', root_password, salt]
+        self.db_cur.execute("INSERT INTO password (name, description, password, salt) VALUES (?, ?, ?, ?)", (root_list))
         self.db.commit()
 
         # Validate table creation to True
@@ -111,10 +120,34 @@ class Database:
 
         self.cursor_lock.release()
       
-    # returns root password
-    def show_root(self):
-        self.logger.info("Getting Root Password...")
-        return self.db_cur.execute("SELECT password FROM password WHERE id= 1").fetchall()[0][0]
+    # create cipher key
+    def cipher_key(self, root_password: str):
+        root_password = str(root_password)
+
+        if self.confirm_root(root_password):
+
+            salt = self.db_cur.execute("SELECT salt FROM password WHERE id = 1").fetchall()[0][0]
+            #key = hashlib.pbkdf2_hmac("sha256", root_password.encode("utf-8"), salt, 100000)
+            kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), salt=salt, iterations=100000, length=32)
+            key = base64.urlsafe_b64encode(kdf.derive(root_password.encode("utf-8")))
+
+            self.cipher = Fernet(key)
+
+    # confirms root password
+    def confirm_root(self, root_password:str):
+        self.logger.info("Confirming Root Password...")
+
+        root_password = str(root_password)
+        root = self.db_cur.execute("SELECT password FROM password WHERE id= 1").fetchall()[0][0]
+
+        hasher = hashlib.sha256()
+        hasher.update(root_password.encode())
+        hashed_root = hasher.hexdigest()
+
+        if hashed_root == root:
+            return True
+        elif hashed_root != root:
+            return False
 
     #confirms if id exists
     def confirm_id(self, id):
@@ -124,38 +157,56 @@ class Database:
         except ValueError:
             return "Invalid ID"
 
-        for i in self.db_cur.execute("SELECT oid FROM password WHERE id != 1").fetchall():
-            if id in i:
-                return True
-            elif id not in i:
-                return False
+        all_id = self.db_cur.execute("SELECT id FROM password WHERE id != 1").fetchall()
+        
+        all_id_list = []
+        for i in all_id:
+            all_id_list.append(i[0])
+
+        if id in all_id_list:
+            return True
+        elif id not in all_id_list:
+            return False
 
     def append_password(self, name: str, description: str, password: str):
 
         self.logger.info("adding new password ...")
-        #self.cursor_lock.acquire()
+        
+        # Encrypt password with aes encryption
+        password = self.cipher.encrypt(password.encode("utf-8"))
+        #password = str(password)
 
         self.db_cur.execute(
             "INSERT INTO password (name, description, password) VALUES(?, ?, ?)", (name, description, password))
         self.db.commit()
-        #self.cursor_lock.release()
+        
 
     def get_passwords(self):
 
         self.logger.info("getting all password information ...")
-        #self.cursor_lock.acquire()
 
         passlist = self.db_cur.execute("SELECT * FROM password WHERE id != 1;").fetchall()
+        passinfo_list = []
 
-        return passlist
+        # Decrypt passwords
+        for password in passlist:
 
-        #self.db.commit()
-        #self.cursor_lock.release()
+            passinfo = []
+            passinfo.append(password[0])
+            passinfo.append(password[1])
+            passinfo.append(password[2])
+            passinfo.append(password[3])
+            
+            passinfo[3] = self.cipher.decrypt(passinfo[3]).decode()
+
+            passinfo_list.append(passinfo)
+
+        return passinfo_list
+
 
     def get_password(self, search: str, name: bool = False) -> list:
 
         self.logger.info("getting all password information ...")
-        #self.cursor_lock.acquire()
 
         # Search by name
         if name:
@@ -163,8 +214,18 @@ class Database:
 
             passlist = []
             for passinfo in self.db_cur.execute("SELECT * FROM password WHERE oid != 1 AND name == (?)", (search,)).fetchall():
+                
+                password = []
+                password.append(passinfo[0])
+                password.append(passinfo[1])
+                password.append(passinfo[2])
+                password.append(passinfo[3])
 
-                passlist.append(passinfo)
+                # Decrypt password
+                password[3] =self.cipher.decrypt(password[3]).decode()
+
+                passlist.append(password)
+                
             
             return passlist
 
@@ -174,15 +235,19 @@ class Database:
 
             passlist = []
             for passinfo in self.db_cur.execute("SELECT * FROM password WHERE oid != 1 AND oid == (?)", (search)).fetchall():
+                
+                passlist.append(passinfo[0])
+                passlist.append(passinfo[1])
+                passlist.append(passinfo[2])
+                passlist.append(passinfo[3])
 
-                passlist.append(passinfo)
-            
+                # Decrypt password
+                passlist[3] =self.cipher.decrypt(passlist[3]).decode()
+
+
             return passlist
             #print(passlist)
             
-
-        #self.db.commit()
-        #self.cursor_lock.release()
 
     def update_password(self, id: str, name="", description="", password=""):
         
@@ -201,18 +266,30 @@ class Database:
         elif name == "" and description != "" and password == "":
             self.db_cur.execute("UPDATE Password SET description = (?) WHERE oid != 1 AND oid == (?)", (description, id))
         elif name == "" and description == "" and password != "":
+            # Encrypt password
+            password = self.cipher.encrypt(password.encode("utf-8"))
+            
             self.db_cur.execute("UPDATE Password SET password = (?) WHERE oid != 1 AND oid == (?)", (password, id))
 
         # Update two columns
         if name != "" and description != "" and password == "":
             self.db_cur.execute("UPDATE Password SET name = (?), description = (?) WHERE oid != 1 AND oid == (?)", (name, description, id))
         elif name != "" and description == "" and password != "":
+            # Encrypt password
+            password = self.cipher.encrypt(password.encode("utf-8"))
+            
             self.db_cur.execute("UPDATE Password SET name = (?), password = (?) WHERE oid != 1 AND oid == (?)", (name, password, id))
         elif name == "" and description != "" and password != "":
+            # Encrypt password
+            password = self.cipher.encrypt(password.encode("utf-8"))
+            
             self.db_cur.execute("UPDATE Password SET description = (?), password = (?) WHERE oid != 1 AND oid == (?)", (description, password, id))
 
         # Update all columns
         if name != "" and description != "" and password != "":
+            # Encrypt password
+            password = self.cipher.encrypt(password.encode("utf-8"))
+            
             self.db_cur.execute("UPDATE Password SET name = (?), description = (?) WHERE oid != 1 AND oid == (?)", (name, description, id))
 
         self.db.commit()
@@ -225,58 +302,66 @@ class Database:
 
         root_password = str(root_password); new_root_password
 
-        if root_password != self.db_cur.execute("SELECT password FROM password WHERE id= 1").fetchall()[0][0]:
+        if not self.confirm_root(root_password):
             self.logger.info("Wrong root passsword...")
             self.db.commit()
             #self.cursor_lock.release()
             return "Wrong Root Password"
         
         else:
-            self.db_cur.execute("UPDATE Password SET password= (?) WHERE oid = 1", (new_root_password, ))
+            # Encrypt root password
+            hasher = hashlib.sha256()
+            hasher.update(new_root_password.encode())
+            new_root_pass = hasher.hexdigest()
+
+            self.db_cur.execute("UPDATE Password SET password= (?) WHERE oid = 1", (new_root_pass, ))
             self.db.commit()
             #self.cursor_lock.release()
+
+            # Change All Password encryption
+            passlist = self.get_passwords()
+            self.cipher_key(new_root_password)
+
+            for password in passlist:
+                self.update_password(password[0], password=password[3])
+            
+            #del passlist
 
 
     def delete_password(self, id: int, root_password: str):
 
         self.logger.info(f"deleting password with id {id} ...")
-        #self.cursor_lock.acquire()
 
         id = str(id)
 
-        if root_password != self.db_cur.execute("SELECT password FROM password WHERE id= 1").fetchall()[0][0]:
+        if not self.confirm_root(root_password):
             self.logger.info("Wrong root passsword...")
             self.db.commit()
-            #self.cursor_lock.release()
             return "Wrong Root Password"
 
         else:
-            self.db_cur.execute("DELETE FROM password WHERE id == ?;", id)
+            self.db_cur.execute("DELETE FROM password WHERE oid != 1 AND id == ?;", id)
             self.db.commit()
-            #self.cursor_lock.release()
 
     def purge(self, root_password: str):
 
         self.logger.info("purging database passwords ...")
-        #self.cursor_lock.acquire()
 
-        if root_password != self.db_cur.execute("SELECT password FROM password WHERE id= 1").fetchall()[0][0]:
+        if not self.confirm_root(root_password):
             self.logger.warning("Wrong root passsword...")
             self.db.commit()
-            #self.cursor_lock.release()
             return "Wrong Root Password"
 
         else:
             # delete all passwords
             self.db_cur.execute("DELETE FROM password WHERE id != 1")
             self.db.commit()
-            #self.cursor_lock.release()
 
     def delete_account(self, root_password: str):
         self.logger.info("Removing Database...")
         #self.cursor_lock.acquire()
 
-        if root_password != self.db_cur.execute("SELECT password FROM password WHERE id= 1").fetchall()[0][0]:
+        if not self.confirm_root(root_password):
             self.logger.warning("Wrong root passsword...")
             self.db.commit()
             #self.cursor_lock.release()
