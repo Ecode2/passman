@@ -179,7 +179,6 @@ class Database:
         self.db_cur.execute(
             "INSERT INTO password (name, description, password) VALUES(?, ?, ?)", (name, description, password))
         self.db.commit()
-        
 
     def get_passwords(self):
 
@@ -203,52 +202,27 @@ class Database:
 
         return passinfo_list
 
-
     def get_password(self, search: str, name: bool = False) -> list:
 
         self.logger.info("getting all password information ...")
 
-        # Search by name
-        if name:
-            search = str(search)
+        by = "name" if name else "oid"
+        search = str(search)
 
-            passlist = []
-            for passinfo in self.db_cur.execute("SELECT * FROM password WHERE oid != 1 AND name == (?)", (search,)).fetchall():
-                
-                password = []
-                password.append(passinfo[0])
-                password.append(passinfo[1])
-                password.append(passinfo[2])
-                password.append(passinfo[3])
-
-                # Decrypt password
-                password[3] =self.cipher.decrypt(password[3]).decode()
-
-                passlist.append(password)
-                
+        passlist = []
+        for passinfo in self.db_cur.execute(f"SELECT * FROM password WHERE oid != 1 AND {by} == (?)", (search,)).fetchall():
             
-            return passlist
+            password = []
+            password.append(passinfo[0])
+            password.append(passinfo[1])
+            password.append(passinfo[2])
+            password.append(passinfo[3])
 
-        #search by id
-        elif not name:
-            search = str(search)
+            password[3] =self.cipher.decrypt(password[3]).decode()
+            passlist.append(password)
 
-            passlist = []
-            for passinfo in self.db_cur.execute("SELECT * FROM password WHERE oid != 1 AND oid == (?)", (search)).fetchall():
-                
-                passlist.append(passinfo[0])
-                passlist.append(passinfo[1])
-                passlist.append(passinfo[2])
-                passlist.append(passinfo[3])
-
-                # Decrypt password
-                passlist[3] =self.cipher.decrypt(passlist[3]).decode()
-
-
-            return passlist
-            #print(passlist)
+        return passlist
             
-
     def update_password(self, id: str, name="", description="", password=""):
         
         self.logger.info("Updating A Password ...")
@@ -327,7 +301,6 @@ class Database:
             
             #del passlist
 
-
     def delete_password(self, id: int, root_password: str):
 
         self.logger.info(f"deleting password with id {id} ...")
@@ -342,6 +315,9 @@ class Database:
         else:
             self.db_cur.execute("DELETE FROM password WHERE oid != 1 AND id == ?;", id)
             self.db.commit()
+
+#TODO: Create File encryption feature (use aes encryption and option to set the decryption key
+#         yourself so the file can be decrypted by other users with the key)
 
     def purge(self, root_password: str):
 
@@ -396,10 +372,10 @@ class Database:
         self.db.close()
 
 if __name__ == "__main__":
-    obj = Database()
+    """ obj = Database()
 
     obj.create_tables("root_password")
     obj.append_password("ecode", "alayaabubakar2005@gmail.com", "Elias_code11")
     #obj.update_password(2, name="Ecode2", description="alayaabubakar@gmail.com")
 
-    #obj.delete_account("root_password")
+    #obj.delete_account("root_password") """

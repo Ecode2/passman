@@ -1,1 +1,3 @@
 cryptography
+cx_freeze
+ttkbootstrap
