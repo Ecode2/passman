@@ -47,7 +47,7 @@ It has a variety of functions, some which include:
    pip install -r requirements.txt
    ```
 
-## Using The App
+## Using The App in Development Mode
 
 Run the application with:
 
@@ -55,7 +55,15 @@ Run the application with:
 python passman.py
 ```
 
-and that's all the application will start running
+## Using The App in Production Mode
+
+Build the application with:
+
+```bash
+pip install cx_freeze
+python setup.py build
+```
+The build will create an executable file
 
 ## Contributing
 

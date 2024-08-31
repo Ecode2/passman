@@ -42,11 +42,20 @@ class Gui:
         self.db = database.Database()
 
         self.assets = Path(__file__).resolve().parent / "assets"
-        self.padlock_icon = PhotoImage(file= self.assets/"padlock.png")
-        self.key_icon = PhotoImage(file= self.assets/"passkey.png")
+        try:
+            self.padlock_icon = PhotoImage(file=self.assets/"padlock.png")
+            self.key_icon = PhotoImage(file= self.assets/"passkey.png")
+        except Exception as e:
+            self.padlock_icon = PhotoImage(file="assets/padlock.png")
+            self.key_icon = PhotoImage(file="assets/passkey.png")
 
     def _check_jsonfile(self):
-        with open(Path(__file__).parent/"database"/"database_table.json", 'r') as json_file:
+        try:
+            json_path=open(Path(__file__).parent/"database"/"database_table.json", 'r')
+        except Exception as e:
+            json_path=open("database/database_table.json", 'r')
+
+        with json_path as json_file:
             json_data = json.load(json_file)
 
             if json_data["validate_table"] == "False":
@@ -425,7 +434,7 @@ class Gui:
 
         if self.show_all_pass_int.get():
             self.show_all = True
-            self.show_pass_int.set(True)
+            self.show_all_pass_int.set(True)
 
         else:
             self.show_all = False
@@ -974,10 +983,6 @@ class Gui:
         self.func_frame = tb.Labelframe(master=self.display_account_frame, labelanchor="n")
         self.func_frame.place(relx = 0.15, rely = 0.2, relwidth=0.7, relheight=0.7 )
 
-        """ ico = PhotoImage(data=Icon.warning, height=20, width=20)
-        id_label = tb.Label(master=self.func_frame, text="unknown", image=ico)
-        id_label.place(relx=0.04, rely=0.35) """
-
         logout_btn = tb.Button(master=self.func_frame, bootstyle="outline-toolbutton", text = "Logout", command= self.logout)
         logout_btn.place(relx=0.05, rely=0.05)
 
@@ -992,7 +997,28 @@ class Gui:
 
 
     def file_actions(self):
-        pass
+        
+        for widget in self.display_files_frame.winfo_children():
+            widget.destroy()
+        self.display_files_frame = tb.Labelframe(master=self.files_frame, labelanchor="n", relief="flat")
+        self.display_files_frame.place(relx = 0, rely = 0, relheight =1, relwidth =1)
+
+        # Create explanation label
+        title = tb.Label(master=self.display_files_frame, text="Encrypt & Decrypt Files", anchor="center", justify="center", font=("monospace", 25, "bold"))
+        title.place(relx=0, rely=0.01, relwidth=1)
+
+        # Function container
+        self.file_func_frame = tb.Labelframe(master=self.display_files_frame, labelanchor="n")
+        self.file_func_frame.place(relx = 0.15, rely = 0.2, relwidth=0.7, relheight=0.7 )
+
+        back_btn = tb.Button(master=self.file_func_frame, bootstyle="outline-toolbutton", text = "Back", command= lambda: self._show_previous_page("File Encryption"))
+        back_btn.place(relx=0.04, rely=0.03)
+
+        self.encrypt_file = tb.Button(master=self.file_func_frame, text = "Encrypt", bootstyle="outline-toolbutton", command = self.change_root_password)
+        self.encrypt_file.place(relx=0.21, rely=0.2, relwidth=0.6)
+
+        self.decrypt_file = tb.Button(master=self.file_func_frame, text = "Decrypt", bootstyle="danger-outline-toolbutton", command = self.delete_all_password)
+        self.decrypt_file.place(relx=0.21, rely=0.6, relwidth=0.6)
 
 
     def _on_tab_change(self, event):
